@@ -1,0 +1,571 @@
+-- #region Setup GUI and Miscellaneous
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame", screenGui)
+Frame.Size = UDim2.new(0, 220, 0, 500)  -- Increased width slightly for better button fitting
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Visible = true
+
+local UICorner = Instance.new("UICorner", Frame)
+UICorner.CornerRadius = UDim.new(0, 10)
+
+local yPos = 10
+-- #endregion
+
+-- #region Add Title "Gooser"
+local titleLabel = Instance.new("TextLabel", Frame)
+titleLabel.Size = UDim2.new(0, 200, 0, 40)  -- Adjust the size to fit the title
+titleLabel.Position = UDim2.new(0, 10, 0, yPos)
+titleLabel.BackgroundTransparency = 1  -- Transparent background
+titleLabel.Text = "Gooser"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  -- White color for title
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 24  -- Slightly bigger font size
+titleLabel.TextXAlignment = Enum.TextXAlignment.Center  -- Center the text
+
+yPos = yPos + 45  -- Adjust for next element (buttons)
+-- #endregion
+
+-- #region Make the UI draggable
+local dragToggle = nil
+local dragStart = nil
+local startPos = nil
+
+-- Function to handle the drag event
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        input.Changed:Connect(function()
+            if dragToggle == false then return end
+            updateDrag(input)
+        end)
+    end
+end)
+
+Frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragToggle = false
+    end
+end)
+-- #endregion
+
+-- #region Player Fly (Replacing the old Fly system)
+local Players = game.Players
+local IYMouse = Players.LocalPlayer:GetMouse()
+local speaker = Players.LocalPlayer
+local QEfly = true
+local iyflyspeed = 50  -- Default fly speed
+
+local function getRoot(char)
+    return char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
+end
+
+local FLYING = false
+local flyKeyDown, flyKeyUp
+
+function sFLY()
+    repeat wait() until Players.LocalPlayer and Players.LocalPlayer.Character and getRoot(Players.LocalPlayer.Character) and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    repeat wait() until IYMouse
+
+    if flyKeyDown then flyKeyDown:Disconnect() end
+    if flyKeyUp then flyKeyUp:Disconnect() end
+
+    local T = getRoot(Players.LocalPlayer.Character)
+    local CONTROL = { F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0 }
+    local lCONTROL = { F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0 }
+    local SPEED = 0
+
+    local function FLY()
+        FLYING = true
+        local BG = Instance.new('BodyGyro', T)
+        local BV = Instance.new('BodyVelocity', T)
+        BG.P = 9e4
+        BG.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+        BG.cframe = T.CFrame
+        BV.velocity = Vector3.new(0, 0, 0)
+        BV.maxForce = Vector3.new(9e9, 9e9, 9e9)
+
+        task.spawn(function()
+            repeat
+                wait()
+                local humanoid = Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+                if humanoid then humanoid.PlatformStand = true end
+
+                local movement = CONTROL.L + CONTROL.R + CONTROL.F + CONTROL.B + CONTROL.Q + CONTROL.E
+                SPEED = (movement ~= 0) and 50 or 0
+
+                local cam = workspace.CurrentCamera
+                local direction = ((cam.CoordinateFrame.lookVector * (CONTROL.F + CONTROL.B)) +
+                    ((cam.CoordinateFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B + CONTROL.Q + CONTROL.E) * 0.2, 0)).p - cam.CoordinateFrame.p)) * SPEED
+
+                BV.velocity = direction
+                lCONTROL = table.clone(CONTROL)
+                BG.cframe = cam.CoordinateFrame
+            until not FLYING
+
+            CONTROL = { F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0 }
+            lCONTROL = { F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0 }
+            SPEED = 0
+            BG:Destroy()
+            BV:Destroy()
+            local humanoid = Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+            if humanoid then humanoid.PlatformStand = false end
+        end)
+    end
+
+    flyKeyDown = IYMouse.KeyDown:Connect(function(KEY)
+        local key = KEY:lower()
+        if key == 'w' then
+            CONTROL.F = iyflyspeed
+        elseif key == 's' then
+            CONTROL.B = -iyflyspeed
+        elseif key == 'a' then
+            CONTROL.L = -iyflyspeed
+        elseif key == 'd' then
+            CONTROL.R = iyflyspeed
+        elseif QEfly and key == 'e' then
+            CONTROL.Q = iyflyspeed * 2
+        elseif QEfly and key == 'q' then
+            CONTROL.E = -iyflyspeed * 2
+        end
+        pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
+    end)
+
+    flyKeyUp = IYMouse.KeyUp:Connect(function(KEY)
+        local key = KEY:lower()
+        if key == 'w' then CONTROL.F = 0
+        elseif key == 's' then CONTROL.B = 0
+        elseif key == 'a' then CONTROL.L = 0
+        elseif key == 'd' then CONTROL.R = 0
+        elseif key == 'e' then CONTROL.Q = 0
+        elseif key == 'q' then CONTROL.E = 0 end
+    end)
+
+    FLY()
+end
+
+function NOFLY()
+    FLYING = false
+    if flyKeyDown then flyKeyDown:Disconnect() end
+    if flyKeyUp then flyKeyUp:Disconnect() end
+
+    local humanoid = Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+    if humanoid then humanoid.PlatformStand = false end
+    pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
+end
+-- #endregion
+
+-- #region Walk on Water Button
+local walkOnWaterButton = Instance.new("TextButton", Frame)
+walkOnWaterButton.Size = UDim2.new(0, 200, 0, 30)
+walkOnWaterButton.Position = UDim2.new(0, 10, 0, yPos)
+walkOnWaterButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+walkOnWaterButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+walkOnWaterButton.Font = Enum.Font.SourceSansBold
+walkOnWaterButton.TextSize = 18
+walkOnWaterButton.Text = "Walk on Water"
+walkOnWaterButton.ZIndex = 2
+
+local walkOnWaterEnabled = false  -- Track the current state of walking on water
+
+-- Function to enable or disable walking on water
+local function WalkOnWater(Val)
+    for i, v in next, game:GetService("Workspace").Water:GetChildren() do
+        if v.Name == "Water" then
+            v.CanCollide = Val
+        end
+    end
+end
+
+-- Toggle walking on water
+walkOnWaterButton.MouseButton1Click:Connect(function()
+    walkOnWaterEnabled = not walkOnWaterEnabled  -- Toggle the state
+
+    if walkOnWaterEnabled then
+        walkOnWaterButton.Text = "Stop Walking on Water"
+        WalkOnWater(true)  -- Enable walk on water
+    else
+        walkOnWaterButton.Text = "Walk on Water"
+        WalkOnWater(false)  -- Disable walk on water
+    end
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+
+-- #region Fly Button
+local flyButton = Instance.new("TextButton", Frame)
+flyButton.Size = UDim2.new(0, 200, 0, 30)
+flyButton.Position = UDim2.new(0, 10, 0, yPos)
+flyButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+flyButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.TextSize = 18
+flyButton.Text = "Fly"
+flyButton.ZIndex = 2
+
+flyButton.MouseButton1Click:Connect(function()
+    if FLYING then
+        NOFLY()
+        flyButton.Text = "Fly"
+    else
+        sFLY()
+        flyButton.Text = "Stop Flying"
+    end
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+
+-- #region Fly Speed TextBox
+local flySpeedTextBox = Instance.new("TextBox", Frame)
+flySpeedTextBox.Size = UDim2.new(0, 180, 0, 30)
+flySpeedTextBox.Position = UDim2.new(0, 10, 0, yPos)
+flySpeedTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+flySpeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Textbox text color yellow
+flySpeedTextBox.Font = Enum.Font.SourceSansBold
+flySpeedTextBox.TextSize = 18
+flySpeedTextBox.Text = tostring(iyflyspeed)  -- Set initial value
+flySpeedTextBox.ClearTextOnFocus = false
+flySpeedTextBox.ZIndex = 2
+
+-- Update fly speed when the user presses "Enter" (or focus out of the box)
+flySpeedTextBox.FocusLost:Connect(function(enterPressed)
+    local newSpeed = tonumber(flySpeedTextBox.Text)
+    if newSpeed and newSpeed >= 1 and newSpeed <= 500 then
+        iyflyspeed = newSpeed
+    else
+        flySpeedTextBox.Text = tostring(iyflyspeed)  -- Reset to current valid speed
+    end
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+-- #endregion
+
+-- #region Teleportation Button (Add partial name match for teleportation)
+local playerNameTextBox = Instance.new("TextBox", Frame)
+playerNameTextBox.Size = UDim2.new(0, 180, 0, 30)
+playerNameTextBox.Position = UDim2.new(0, 10, 0, yPos)
+playerNameTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+playerNameTextBox.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Textbox text color yellow
+playerNameTextBox.Font = Enum.Font.SourceSansBold
+playerNameTextBox.TextSize = 18
+playerNameTextBox.ClearTextOnFocus = false
+playerNameTextBox.Text = ""  -- Initial text value
+playerNameTextBox.ZIndex = 2
+
+yPos = yPos + 35  -- Adjust for next button placement
+
+local teleportButton = Instance.new("TextButton", Frame)
+teleportButton.Size = UDim2.new(0, 200, 0, 30)
+teleportButton.Position = UDim2.new(0, 10, 0, yPos)
+teleportButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+teleportButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+teleportButton.Font = Enum.Font.SourceSansBold
+teleportButton.TextSize = 18
+teleportButton.Text = "Teleport to Player"
+teleportButton.ZIndex = 2
+
+-- Function to teleport to a player by Name or DisplayName with partial matching
+teleportButton.MouseButton1Click:Connect(function()
+    local playerName = playerNameTextBox.Text:lower()  -- Get the input and make it lowercase for case-insensitive comparison
+    local foundPlayer = nil
+
+    -- Try to find a player by Name or DisplayName with partial match
+    for _, player in pairs(game.Players:GetPlayers()) do
+        -- Check if either the player's Name or DisplayName starts with the input text
+        if player.Name:lower():sub(1, #playerName) == playerName or player.DisplayName:lower():sub(1, #playerName) == playerName then
+            foundPlayer = player
+            break  -- Stop at the first match
+        end
+    end
+
+    -- If a player is found, teleport to them
+    if foundPlayer then
+        local character = foundPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local humanoidRootPart = character.HumanoidRootPart
+            local myCharacter = game.Players.LocalPlayer.Character
+            if myCharacter and myCharacter:FindFirstChild("HumanoidRootPart") then
+                local myHumanoidRootPart = myCharacter.HumanoidRootPart
+                myHumanoidRootPart.CFrame = humanoidRootPart.CFrame  -- Teleport to player's position
+            end
+        end
+    else
+        warn("Player not found.")
+    end
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+-- #endregion
+-- Ensure the Speed is set to 16 initially
+getgenv().Speed = 16
+
+-- #region Walk Speed TextBox and Buttons (Inside your existing GUI)
+local yPos = yPos + 35  -- Continue from where your previous buttons left off
+
+-- Create a TextBox for entering walk speed
+local walkSpeedTextBox = Instance.new("TextBox", Frame)
+walkSpeedTextBox.Size = UDim2.new(0, 180, 0, 30)
+walkSpeedTextBox.Position = UDim2.new(0, 10, 0, yPos)
+walkSpeedTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+walkSpeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Text color yellow
+walkSpeedTextBox.Font = Enum.Font.SourceSansBold
+walkSpeedTextBox.TextSize = 18
+walkSpeedTextBox.Text = tostring(getgenv().Speed)  -- Initial value from getgenv().Speed
+walkSpeedTextBox.ClearTextOnFocus = false
+walkSpeedTextBox.ZIndex = 2
+
+-- Create a button to apply walk speed
+local walkSpeedButton = Instance.new("TextButton", Frame)
+walkSpeedButton.Size = UDim2.new(0, 200, 0, 30)
+walkSpeedButton.Position = UDim2.new(0, 10, 0, yPos + 35)
+walkSpeedButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+walkSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Text color yellow
+walkSpeedButton.Font = Enum.Font.SourceSansBold
+walkSpeedButton.TextSize = 18
+walkSpeedButton.Text = "Set Walk Speed"
+walkSpeedButton.ZIndex = 2
+
+-- Function to update the walk speed when the button is clicked
+walkSpeedButton.MouseButton1Click:Connect(function()
+    local newSpeed = tonumber(walkSpeedTextBox.Text)  -- Get the value from the text box
+    if newSpeed and newSpeed > 0 then
+        getgenv().Speed = newSpeed
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = newSpeed
+    else
+        walkSpeedTextBox.Text = tostring(getgenv().Speed)  -- Reset to current walk speed if invalid input
+    end
+end)
+
+yPos = yPos + 70  -- Adjust for next element (button and textbox height)
+
+-- #region Walk Speed Script (This is the walk speed script you provided earlier)
+function Walkspeed()
+    game.Players.LocalPlayer.Character.Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().Speed
+    end)
+    game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().Speed
+end
+
+-- Call Walkspeed() to start the functionality
+Walkspeed()
+-- #endregion
+-- #region Open/Close Button
+local openCloseButton = Instance.new("TextButton", screenGui)
+openCloseButton.Size = UDim2.new(0, 100, 0, 30)  -- Size of the button
+openCloseButton.Position = UDim2.new(0, 10, 0, 10)  -- Position it at the top-left corner
+openCloseButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+openCloseButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Text color yellow
+openCloseButton.Font = Enum.Font.SourceSansBold
+openCloseButton.TextSize = 18
+openCloseButton.Text = "Open"  -- Button text initially set to "Open"
+openCloseButton.ZIndex = 2
+
+-- Function to toggle the visibility of the GUI
+openCloseButton.MouseButton1Click:Connect(function()
+    if Frame.Visible then
+        Frame.Visible = false  -- Close the GUI
+        openCloseButton.Text = "Open"  -- Change button text to "Open"
+    else
+        Frame.Visible = true  -- Open the GUI
+        openCloseButton.Text = "Close"  -- Change button text to "Close"
+    end
+end)
+-- #endregion
+-- #region NoClip Button and Functionality
+local noclipButton = Instance.new("TextButton", Frame)
+noclipButton.Size = UDim2.new(0, 200, 0, 30)
+noclipButton.Position = UDim2.new(0, 10, 0, yPos)
+noclipButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+noclipButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+noclipButton.Font = Enum.Font.SourceSansBold
+noclipButton.TextSize = 18
+noclipButton.Text = "Enable NoClip"
+noclipButton.ZIndex = 2
+
+local noclipEnabled = false  -- Track the current state of NoClip
+
+-- Function to enable or disable NoClip
+local function toggleNoClip()
+    local character = game.Players.LocalPlayer.Character
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if character and humanoid then
+        if noclipEnabled then
+            -- Disable NoClip (set collision back on)
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+            noclipEnabled = false
+            noclipButton.Text = "Enable NoClip"
+        else
+            -- Enable NoClip (disable collision)
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+            noclipEnabled = true
+            noclipButton.Text = "Disable NoClip"
+        end
+    end
+end
+
+-- Toggle NoClip when the button is clicked
+noclipButton.MouseButton1Click:Connect(function()
+    toggleNoClip()
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+-- #endregion
+-- #region Persistent No Fog Feature
+local noFogButton = Instance.new("TextButton", Frame)
+noFogButton.Size = UDim2.new(0, 200, 0, 30)
+noFogButton.Position = UDim2.new(0, 10, 0, yPos)
+noFogButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+noFogButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+noFogButton.Font = Enum.Font.SourceSansBold
+noFogButton.TextSize = 18
+noFogButton.Text = "Toggle No Fog"
+noFogButton.ZIndex = 2
+
+local fogEnabled = true  -- Track whether fog is enabled or not
+
+-- Function to toggle the fog
+noFogButton.MouseButton1Click:Connect(function()
+    if fogEnabled then
+        -- Disable fog by setting FogEnd to a very high number
+        game.Lighting.FogEnd = 100000
+        noFogButton.Text = "Enable Fog"  -- Change button text to "Enable Fog"
+    else
+        -- Re-enable fog by setting FogEnd back to a typical value
+        game.Lighting.FogEnd = 1000  -- Default fog distance (can be adjusted to suit your needs)
+        noFogButton.Text = "Toggle No Fog"  -- Change button text to "No Fog"
+    end
+    
+    fogEnabled = not fogEnabled  -- Toggle fog state
+end)
+
+-- Ensure fog stays off continuously
+game:GetService("RunService").Heartbeat:Connect(function()
+    if fogEnabled then
+        -- Continuously keep fog disabled
+        game.Lighting.FogEnd = 100000
+    else
+        -- Continuously ensure the fog is re-enabled to a normal value
+        game.Lighting.FogEnd = 1000
+    end
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+-- #endregion
+-- #region Teleportation Buttons (Wood R Us and Land Store)
+local teleportButtonWoodRUs = Instance.new("TextButton", Frame)
+teleportButtonWoodRUs.Size = UDim2.new(0, 200, 0, 30)
+teleportButtonWoodRUs.Position = UDim2.new(0, 10, 0, yPos)
+teleportButtonWoodRUs.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+teleportButtonWoodRUs.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+teleportButtonWoodRUs.Font = Enum.Font.SourceSansBold
+teleportButtonWoodRUs.TextSize = 18
+teleportButtonWoodRUs.Text = "TP to Wood R Us"
+teleportButtonWoodRUs.ZIndex = 2
+
+local teleportButtonLandStore = Instance.new("TextButton", Frame)
+teleportButtonLandStore.Size = UDim2.new(0, 200, 0, 30)
+teleportButtonLandStore.Position = UDim2.new(0, 10, 0, yPos + 35)
+teleportButtonLandStore.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+teleportButtonLandStore.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+teleportButtonLandStore.Font = Enum.Font.SourceSansBold
+teleportButtonLandStore.TextSize = 18
+teleportButtonLandStore.Text = "TP to Land Store"
+teleportButtonLandStore.ZIndex = 2
+
+-- Function to teleport player
+local TeleportPoints = {
+    ["Wood R Us!"] = CFrame.new(
+        281.425934, 6.40898323, 58.7454567,
+        -6.47306442e-05, 0.973831236, 0.227272108,
+        0.99999994, 6.47902489e-05, 7.4505806e-06,
+        -7.4505806e-06, 0.227272108, -0.973831177
+    ),
+
+    ["Land Store"] = CFrame.new(
+        296.799805, 2.80011201, -99.0998535,
+        0, 0, 1,
+        0, 1, 0,
+        -1, 0, 0
+    ),
+}
+
+local function teleportPlayer(name)
+    local cframe = TeleportPoints[name]
+    local player = game.Players.LocalPlayer
+    if cframe and player and player.Character then
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = cframe
+        end
+    end
+end
+
+-- Connect the teleportation buttons to the teleport function
+teleportButtonWoodRUs.MouseButton1Click:Connect(function()
+    teleportPlayer("Wood R Us!")
+end)
+
+teleportButtonLandStore.MouseButton1Click:Connect(function()
+    teleportPlayer("Land Store")
+end)
+
+yPos = yPos + 70  -- Adjust for next button placement
+-- #endregion
+-- #region Always Day Button
+local alwaysDayButton = Instance.new("TextButton", Frame)
+alwaysDayButton.Size = UDim2.new(0, 200, 0, 30)
+alwaysDayButton.Position = UDim2.new(0, 10, 0, yPos)
+alwaysDayButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+alwaysDayButton.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Make button text yellow
+alwaysDayButton.Font = Enum.Font.SourceSansBold
+alwaysDayButton.TextSize = 18
+alwaysDayButton.Text = "Always Day"
+alwaysDayButton.ZIndex = 2
+
+-- Function to toggle the time to always day
+local dayEnabled = false  -- Track whether it's always day
+
+alwaysDayButton.MouseButton1Click:Connect(function()
+    if dayEnabled then
+        -- Disable Always Day, revert to normal time
+        game.Lighting.ClockTime = 12  -- Reset to default day time (can be adjusted)
+        alwaysDayButton.Text = "Always Day"  -- Change button text to "Always Day"
+    else
+        -- Enable Always Day
+        game.Lighting.ClockTime = 12  -- Set to daytime (12:00 PM)
+        game.Lighting.TimeOfDay = "12:00:00"  -- Force time to remain at noon
+        game.Lighting:SetMinutesAfterMidnight(720)  -- Set to always stay at noon (12:00 PM)
+
+        -- Continuous check to keep it daytime
+        game:GetService("RunService").Heartbeat:Connect(function()
+            if game.Lighting.ClockTime < 12 or game.Lighting.ClockTime >= 18 then
+                game.Lighting.ClockTime = 12  -- Ensure it stays at day (12:00 PM)
+            end
+        end)
+
+        alwaysDayButton.Text = "Stop Always Day"  -- Change button text to "Stop Always Day"
+    end
+
+    dayEnabled = not dayEnabled  -- Toggle the day state
+end)
+
+yPos = yPos + 35  -- Adjust for next button placement
+-- #endregion
